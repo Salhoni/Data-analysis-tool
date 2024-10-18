@@ -1,146 +1,110 @@
-# Import required libraries
 import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import plotly.express as px
-import plotly.graph_objects as go
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error, r2_score
 from scipy import stats
-from io import StringIO
 
 # Title of the web app
-st.title("Interactive Data Analysis Tool")
+st.title('Interactive Data Analysis Tool')
 
-# Upload dataset section
-st.sidebar.header("Upload your data")
-uploaded_file = st.sidebar.file_uploader("Choose a file", type=['csv', 'xlsx', 'txt'])
+# File upload section
+uploaded_file = st.file_uploader("Upload a CSV, Excel, or TXT file", type=["csv", "xlsx", "txt"])
 
-# Load dataset
-def load_data(file):
-    if file is not None:
-        if file.name.endswith('.csv'):
-            df = pd.read_csv(file)
-        elif file.name.endswith('.xlsx'):
-            df = pd.read_excel(file)
-        elif file.name.endswith('.txt'):
-            df = pd.read_csv(file, delimiter='\t')
+if uploaded_file is not None:
+    # Detect the file type and load data accordingly
+    try:
+        if uploaded_file.name.endswith('.csv'):
+            df = pd.read_csv(uploaded_file)
+        elif uploaded_file.name.endswith('.xlsx'):
+            df = pd.read_excel(uploaded_file)
+        elif uploaded_file.name.endswith('.txt'):
+            df = pd.read_csv(uploaded_file, delimiter='\t')
         else:
-            st.error("Unsupported file format! Please upload CSV, Excel, or TXT file.")
-        return df
-    return None
+            st.error("Unsupported file format! Please upload a CSV, Excel, or TXT file.")
+        st.success("File uploaded successfully!")
 
-df = load_data(uploaded_file)
+        # Display dataset
+        st.subheader('Dataset Preview')
+        st.dataframe(df.head())
 
-if df is not None:
-    st.write("### Dataset Preview")
-    st.write(df.head())
-    
-    st.write("### Summary Statistics")
-    st.write(df.describe())
+        # Missing values handling
+        st.subheader('Missing Values Handling')
+        missing_option = st.selectbox("Select how to handle missing values", ["Drop rows", "Fill with mean", "Fill with median"])
+        if missing_option == "Drop rows":
+            df_cleaned = df.dropna()
+        elif missing_option == "Fill with mean":
+            df_cleaned = df.fillna(df.mean())
+        elif missing_option == "Fill with median":
+            df_cleaned = df.fillna(df.median())
 
-    # Handling missing values
-    st.sidebar.subheader("Missing Values Handling")
-    missing_value_options = st.sidebar.selectbox('Select method to handle missing values', 
-                                                 ['None', 'Drop rows', 'Fill with mean', 'Fill with median'])
-    
-    if missing_value_options == 'Drop rows':
-        df_cleaned = df.dropna()
-    elif missing_value_options == 'Fill with mean':
-        df_cleaned = df.fillna(df.mean())
-    elif missing_value_options == 'Fill with median':
-        df_cleaned = df.fillna(df.median())
-    else:
-        df_cleaned = df
+        st.write("Data after handling missing values")
+        st.dataframe(df_cleaned.head())
 
-    st.write("Updated Data after Missing Values Handling")
-    st.write(df_cleaned.head())
+        # Basic Statistics
+        st.subheader('Basic Statistics')
+        st.write(df_cleaned.describe())
 
-    # Visualization Section
-    st.sidebar.subheader("Visualize Data")
-    plot_type = st.sidebar.selectbox("Select plot type", ['Line Plot', 'Bar Chart', 'Scatter Plot', 'Box Plot', 'Histogram', 'Correlation Heatmap'])
-    x_col = st.sidebar.selectbox("X-axis", df_cleaned.columns)
-    y_col = st.sidebar.selectbox("Y-axis", df_cleaned.columns)
+        # Visualization options
+        st.subheader('Data Visualization')
+        plot_type = st.selectbox("Select plot type", ["Line Plot", "Bar Chart", "Scatter Plot", "Box Plot", "Correlation Heatmap"])
+        x_col = st.selectbox("Select X-axis column", df_cleaned.columns)
+        y_col = st.selectbox("Select Y-axis column", df_cleaned.columns)
 
-    # Visualization function
-    def visualize_data(plot_type, x_col, y_col):
         if plot_type == "Line Plot":
-            plt.figure(figsize=(10, 5))
-            plt.plot(df_cleaned[x_col], df_cleaned[y_col], color="green")
-            plt.title(f'Line Plot of {y_col} vs {x_col}')
-            plt.xlabel(x_col)
-            plt.ylabel(y_col)
-            st.pyplot(plt)
-
+            st.line_chart(df_cleaned[[x_col, y_col]])
         elif plot_type == "Bar Chart":
-            plt.figure(figsize=(10, 5))
-            plt.bar(df_cleaned[x_col], df_cleaned[y_col], color="orange")
-            plt.title(f'Bar Chart of {y_col} vs {x_col}')
-            plt.xlabel(x_col)
-            plt.ylabel(y_col)
-            st.pyplot(plt)
-
+            st.bar_chart(df_cleaned[[x_col, y_col]])
         elif plot_type == "Scatter Plot":
             fig = px.scatter(df_cleaned, x=x_col, y=y_col)
             st.plotly_chart(fig)
-
         elif plot_type == "Box Plot":
             fig = px.box(df_cleaned, x=x_col, y=y_col)
             st.plotly_chart(fig)
-
-        elif plot_type == "Histogram":
-            fig = px.histogram(df_cleaned, x=x_col)
-            st.plotly_chart(fig)
-
         elif plot_type == "Correlation Heatmap":
-            plt.figure(figsize=(10, 8))
-            sns.heatmap(df_cleaned.corr(), annot=True, cmap="coolwarm")
-            plt.title('Correlation Heatmap')
-            st.pyplot(plt)
+            corr = df_cleaned.corr()
+            fig, ax = plt.subplots()
+            sns.heatmap(corr, annot=True, ax=ax, cmap='coolwarm')
+            st.pyplot(fig)
 
-    visualize_data(plot_type, x_col, y_col)
+        # Linear Regression model
+        st.subheader('Linear Regression Model')
+        x_col_reg = st.selectbox("Select feature column (X) for regression", df_cleaned.columns)
+        y_col_reg = st.selectbox("Select target column (Y) for regression", df_cleaned.columns)
 
-    # Linear Regression
-    st.sidebar.subheader("Linear Regression")
-    regression_x_col = st.sidebar.selectbox("Select X for regression", df_cleaned.columns)
-    regression_y_col = st.sidebar.selectbox("Select Y for regression", df_cleaned.columns)
-
-    if st.sidebar.button("Run Linear Regression"):
-        X = df_cleaned[[regression_x_col]].values.reshape(-1, 1)
-        y = df_cleaned[regression_y_col].values
-
+        X = df_cleaned[[x_col_reg]].values
+        y = df_cleaned[y_col_reg].values
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
         model = LinearRegression()
         model.fit(X_train, y_train)
-
         predictions = model.predict(X_test)
-        st.write("### Model Performance")
+
         st.write("Mean Squared Error:", mean_squared_error(y_test, predictions))
         st.write("R-squared:", r2_score(y_test, predictions))
 
-        plt.figure(figsize=(10, 5))
-        plt.scatter(y_test, predictions)
-        plt.plot(y_test, y_test, color='r')
-        plt.title('Predictions vs Actual')
-        plt.xlabel('Actual Values')
-        plt.ylabel('Predicted Values')
-        st.pyplot(plt)
+        fig, ax = plt.subplots()
+        ax.scatter(y_test, predictions)
+        ax.plot(y_test, y_test, color='red')
+        ax.set_xlabel("Actual Values")
+        ax.set_ylabel("Predicted Values")
+        st.pyplot(fig)
 
-    # Advanced Statistical Analysis
-    st.sidebar.subheader("Advanced Statistical Analysis")
-    t_test_cols = st.sidebar.multiselect('Select columns for T-Test', df_cleaned.select_dtypes(include=np.number).columns)
-
-    if len(t_test_cols) >= 2:
-        col1, col2 = t_test_cols[:2]
-        t_stat, p_value = stats.ttest_ind(df_cleaned[col1].dropna(), df_cleaned[col2].dropna())
+        # Advanced Statistical Analysis - T-test
+        st.subheader("T-test Analysis")
+        ttest_col1 = st.selectbox("Select first column for T-test", df_cleaned.select_dtypes(include=np.number).columns)
+        ttest_col2 = st.selectbox("Select second column for T-test", df_cleaned.select_dtypes(include=np.number).columns)
+        
+        t_stat, p_value = stats.ttest_ind(df_cleaned[ttest_col1].dropna(), df_cleaned[ttest_col2].dropna())
         st.write(f"T-Statistic: {t_stat}")
         st.write(f"P-Value: {p_value}")
-    else:
-        st.write("Please select at least 2 columns for T-test.")
+
+    except Exception as e:
+        st.error(f"Error processing file: {e}")
 
 else:
-    st.write("Please upload a dataset to begin.")
-
+    st.info("Please upload a file to proceed.")
